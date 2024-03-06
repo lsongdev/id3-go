@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -16,7 +15,7 @@ import (
 // http://id3.org/id3v2.4.0-structure
 type ID3v2Header struct {
 	Version           int
-	MinorVersion      int
+	Revision          int
 	Unsynchronization bool
 	Extended          bool
 	Experimental      bool
@@ -26,16 +25,18 @@ type ID3v2Header struct {
 
 // A parsed ID3 file with common fields exposed.
 type ID3v2Tag struct {
-	Header ID3v2Header
+	Header *ID3v2Header
+	Frames []*ID3v2Frame
 
-	Title  string
-	Artist string
-	Album  string
-	Year   string
-	Track  string
-	Disc   string
-	Genre  string
-	Length string
+	v1.ID3v1Tag
+
+	Disc   string `json:"disc"`
+	Length string `json:"length"`
+}
+
+type ID3v2Frame struct {
+	Id   string
+	Data []byte
 }
 
 var skipBuffer []byte = make([]byte, 1024*4)
@@ -120,15 +121,15 @@ func parseSize(data []byte) int32 {
 func parseString(data []byte) string {
 	var s string
 	switch data[0] {
-	case 0: // ISO-8859-1 text.
+	case 0x00: // ISO-8859-1 text.
 		s = ISO8859_1ToUTF8(data[1:])
 		break
-	case 1: // UTF-16 with BOM.
+	case 0x01: // UTF-16 with BOM.
 		s = string(utf16.Decode(toUTF16(data[1:])))
 		break
-	case 2: // UTF-16BE without BOM.
+	case 0x02: // UTF-16BE without BOM.
 		panic("Unsupported text encoding UTF-16BE.")
-	case 3: // UTF-8 text.
+	case 0x03: // UTF-8 text.
 		s = string(data[1:])
 		break
 	default:
@@ -195,53 +196,41 @@ func convertID3v1Genre(genre string) string {
 		return "Cover"
 	}
 
-	var id3v1Genres = v1.ID3v1Genres
 	// Try to parse "NN" format.
 	index, err := strconv.Atoi(genre)
 	if err == nil {
-		if index >= 0 && index < len(id3v1Genres) {
-			return id3v1Genres[index]
-		}
-		return "Unknown"
+		return v1.GetGenre(index)
 	}
-
 	// Try to parse "(NN)" format.
-	index = 0
 	_, err = fmt.Sscanf(genre, "(%d)", &index)
 	if err == nil {
-		if index >= 0 && index < len(id3v1Genres) {
-			return id3v1Genres[index]
-		}
-		return "Unknown"
+		return v1.GetGenre(index)
 	}
-
 	// Couldn't parse so it's likely not an ID3v1 genre.
 	return genre
 }
 
 // Parse the input for ID3 information. Returns nil if parsing failed or the
 // input didn't contain ID3 information.
-func Read(reader io.Reader) *ID3v2Tag {
-	file := new(ID3v2Tag)
+func Read(reader io.Reader) (tag *ID3v2Tag, err error) {
+	tag = new(ID3v2Tag)
 	bufReader := bufio.NewReader(reader)
-	if !isID3Tag(bufReader) {
-		log.Println("No ID3v2 tag found.")
-		return nil
+	tag.Header, err = ParseID3v2Header(bufReader)
+	if err != nil {
+		return
 	}
-
-	parseID3v2Header(bufReader, file)
-	limitReader := bufio.NewReader(io.LimitReader(bufReader, int64(file.Header.Size)))
-	if file.Header.Version == 2 {
-		parseID3v22File(limitReader, file)
-	} else if file.Header.Version == 3 {
-		parseID3v23File(limitReader, file)
-	} else if file.Header.Version == 4 {
-		parseID3v24File(limitReader, file)
+	limitReader := bufio.NewReader(io.LimitReader(bufReader, int64(tag.Header.Size)))
+	if tag.Header.Version == 2 {
+		parseID3v22File(limitReader, tag)
+	} else if tag.Header.Version == 3 {
+		parseID3v23File(limitReader, tag)
+	} else if tag.Header.Version == 4 {
+		parseID3v24File(limitReader, tag)
 	} else {
-		panic(fmt.Sprintf("Unrecognized ID3v2 version: %d", file.Header.Version))
+		err = fmt.Errorf("unrecognized ID3v2 version: %d", tag.Header.Version)
+		return
 	}
-
-	return file
+	return
 }
 
 func isID3Tag(reader *bufio.Reader) bool {
@@ -249,16 +238,25 @@ func isID3Tag(reader *bufio.Reader) bool {
 	if len(data) < 3 || err != nil {
 		return false
 	}
-	return data[0] == 'I' && data[1] == 'D' && data[2] == '3'
+	return string(data[0:3]) == "ID3"
 }
 
-func parseID3v2Header(reader *bufio.Reader, file *ID3v2Tag) {
+func (h *ID3v2Tag) Version() string {
+	return fmt.Sprintf("2.%d.%d", h.Header.Version, h.Header.Revision)
+}
+
+func ParseID3v2Header(reader *bufio.Reader) (*ID3v2Header, error) {
+	if !isID3Tag(reader) {
+		return nil, fmt.Errorf("invalid ID3 header")
+	}
 	data := readBytes(reader, 10)
-	file.Header.Version = int(data[3])
-	file.Header.MinorVersion = int(data[4])
-	file.Header.Unsynchronization = data[5]&1<<7 != 0
-	file.Header.Extended = data[5]&1<<6 != 0
-	file.Header.Experimental = data[5]&1<<5 != 0
-	file.Header.Footer = data[5]&1<<4 != 0
-	file.Header.Size = parseSize(data[6:])
+	h := new(ID3v2Header)
+	h.Version = int(data[3])
+	h.Revision = int(data[4])
+	h.Unsynchronization = data[5]&1<<7 != 0
+	h.Extended = data[5]&1<<6 != 0
+	h.Experimental = data[5]&1<<5 != 0
+	h.Footer = data[5]&1<<4 != 0
+	h.Size = parseSize(data[6:])
+	return h, nil
 }

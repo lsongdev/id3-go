@@ -12,7 +12,7 @@ func parseID3v23Size(reader *bufio.Reader) int {
 	return int(size)
 }
 
-func parseID3v23File(reader *bufio.Reader, file *ID3v2Tag) {
+func parseID3v23File(reader *bufio.Reader, tag *ID3v2Tag) {
 	for hasFrame(reader, 4) {
 		id := string(readBytes(reader, 4))
 		size := parseID3v23Size(reader)
@@ -20,25 +20,30 @@ func parseID3v23File(reader *bufio.Reader, file *ID3v2Tag) {
 		// Skip over frame flags.
 		skipBytes(reader, 2)
 
-		switch id {
+		frame := &ID3v2Frame{
+			Id:   id,
+			Data: readBytes(reader, size),
+		}
+		tag.Frames = append(tag.Frames, frame)
+	}
+	for _, frame := range tag.Frames {
+		switch frame.Id {
 		case "TALB":
-			file.Album = readString(reader, size)
+			tag.Album = parseString(frame.Data)
 		case "TRCK":
-			file.Track = readString(reader, size)
+			tag.Track = parseString(frame.Data)
 		case "TPE1":
-			file.Artist = readString(reader, size)
+			tag.Artist = parseString(frame.Data)
 		case "TCON":
-			file.Genre = readGenre(reader, size)
+			tag.Genre = parseString(frame.Data)
 		case "TIT2":
-			file.Title = readString(reader, size)
+			tag.Title = parseString(frame.Data)
 		case "TYER":
-			file.Year = readString(reader, size)
+			tag.Year = parseString(frame.Data)
 		case "TPOS":
-			file.Disc = readString(reader, size)
+			tag.Disc = parseString(frame.Data)
 		case "TLEN":
-			file.Length = readString(reader, size)
-		default:
-			skipBytes(reader, size)
+			tag.Length = parseString(frame.Data)
 		}
 	}
 }

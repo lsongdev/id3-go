@@ -6,21 +6,21 @@ import (
 )
 
 type ID3v1Tag struct {
-	Title   string
-	Artist  string
-	Album   string
-	Year    string
-	Comment string
-	Track   string
-	Genre   string
+	Title   string `json:"title"`
+	Artist  string `json:"artist"`
+	Album   string `json:"album"`
+	Year    string `json:"year"`
+	Track   string `json:"track"`
+	Genre   string `json:"genre"`
+	Comment string `json:"comment"`
 }
 
 func trimString(data []byte) string {
 	return strings.TrimRight(string(data), "\u0000")
 }
 
-func getGenre(i byte) string {
-	if int(i) > len(ID3v1Genres)-1 {
+func GetGenre(i int) string {
+	if i > len(ID3v1Genres)-1 {
 		return "Unspecified"
 	}
 	return ID3v1Genres[i]
@@ -30,7 +30,7 @@ func getGenre(i byte) string {
 // an ID3v1Tag struct with parsed strings from the tag for each field.
 func ParseID3v1Tag(data []byte) (*ID3v1Tag, error) {
 	if string(data[0:3]) != "TAG" {
-		return nil, fmt.Errorf("Invalid ID3v1 header: %s", string(data[0:3]))
+		return nil, fmt.Errorf("invalid ID3v1 header: %s", string(data[0:3]))
 	}
 	tag := new(ID3v1Tag)
 	tag.Title = trimString(data[3:33])
@@ -43,6 +43,6 @@ func ParseID3v1Tag(data []byte) (*ID3v1Tag, error) {
 	} else {
 		tag.Comment = trimString(data[97:127])
 	}
-	tag.Genre = getGenre(data[127])
+	tag.Genre = GetGenre(int(data[127]))
 	return tag, nil
 }

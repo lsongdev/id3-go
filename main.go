@@ -25,8 +25,8 @@ func main() {
 			log.Println(err)
 			return nil
 		}
-		tag := v2.Read(f)
-		log.Println(tag.Title, tag.Artist, tag.Album, tag.Year, tag.Track, tag.Genre, tag.Length)
+		tag, err := v2.Read(f)
+		log.Println(err, tag.Version(), tag.Title, tag.Artist, tag.Album, tag.Year, tag.Track, tag.Genre, tag.Length)
 		f.Close()
 		return nil
 	})
