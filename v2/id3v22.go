@@ -1,37 +1,73 @@
 package v2
 
-import (
-	"bufio"
-)
-
 // ID3 v2.2 uses 24-bit big endian frame sizes.
-func parseID3v22FrameSize(reader *bufio.Reader) int {
-	size := readBytes(reader, 3)
-	return int(size[0])<<16 | int(size[1])<<8 | int(size[2])
+func ParseID3v22FrameSize(data []byte) int {
+	return int(data[0])<<16 | int(data[1])<<8 | int(data[2])
 }
 
-func parseID3v22File(reader *bufio.Reader, file *ID3v2Tag) {
-	for hasFrame(reader, 3) {
-		id := string(readBytes(reader, 3))
-		size := parseID3v22FrameSize(reader)
-
-		switch id {
-		case "TAL":
-			file.Album = readString(reader, size)
-		case "TRK":
-			file.Track = readString(reader, size)
-		case "TP1":
-			file.Artist = readString(reader, size)
-		case "TT2":
-			file.Title = readString(reader, size)
-		case "TYE":
-			file.Year = readString(reader, size)
-		case "TPA":
-			file.Disc = readString(reader, size)
-		case "TCO":
-			file.Genre = readGenre(reader, size)
-		default:
-			skipBytes(reader, size)
-		}
-	}
+// V22FrameTypeMap specifies the frame IDs and constructors allowed in ID3v2.2
+var V22FrameTypeMap = map[string]FrameType{
+	"BUF": {id: "BUF", description: "Recommended buffer size", constructor: ParseDataFrame},
+	"CNT": {id: "CNT", description: "Play counter", constructor: ParseDataFrame},
+	"COM": {id: "COM", description: "Comments", constructor: ParseUnsynchTextFrame},
+	"CRA": {id: "CRA", description: "Audio encryption", constructor: ParseDataFrame},
+	"CRM": {id: "CRM", description: "Encrypted meta frame", constructor: ParseDataFrame},
+	"ETC": {id: "ETC", description: "Event timing codes", constructor: ParseDataFrame},
+	"EQU": {id: "EQU", description: "Equalization", constructor: ParseDataFrame},
+	"GEO": {id: "GEO", description: "General encapsulated object", constructor: ParseDataFrame},
+	"IPL": {id: "IPL", description: "Involved people list", constructor: ParseDataFrame},
+	"LNK": {id: "LNK", description: "Linked information", constructor: ParseDataFrame},
+	"MCI": {id: "MCI", description: "Music CD Identifier", constructor: ParseDataFrame},
+	"MLL": {id: "MLL", description: "MPEG location lookup table", constructor: ParseDataFrame},
+	"PIC": {id: "PIC", description: "Attached picture", constructor: ParseDataFrame},
+	"POP": {id: "POP", description: "Popularimeter", constructor: ParseDataFrame},
+	"REV": {id: "REV", description: "Reverb", constructor: ParseDataFrame},
+	"RVA": {id: "RVA", description: "Relative volume adjustment", constructor: ParseDataFrame},
+	"SLT": {id: "SLT", description: "Synchronized lyric/text", constructor: ParseDataFrame},
+	"STC": {id: "STC", description: "Synced tempo codes", constructor: ParseDataFrame},
+	"TAL": {id: "TAL", description: "Album/Movie/Show title", constructor: ParseTextFrame},
+	"TBP": {id: "TBP", description: "BPM (Beats Per Minute)", constructor: ParseTextFrame},
+	"TCM": {id: "TCM", description: "Composer", constructor: ParseTextFrame},
+	"TCO": {id: "TCO", description: "Content type", constructor: ParseTextFrame},
+	"TCR": {id: "TCR", description: "Copyright message", constructor: ParseTextFrame},
+	"TDA": {id: "TDA", description: "Date", constructor: ParseTextFrame},
+	"TDY": {id: "TDY", description: "Playlist delay", constructor: ParseTextFrame},
+	"TEN": {id: "TEN", description: "Encoded by", constructor: ParseTextFrame},
+	"TFT": {id: "TFT", description: "File type", constructor: ParseTextFrame},
+	"TIM": {id: "TIM", description: "Time", constructor: ParseTextFrame},
+	"TKE": {id: "TKE", description: "Initial key", constructor: ParseTextFrame},
+	"TLA": {id: "TLA", description: "Language(s)", constructor: ParseTextFrame},
+	"TLE": {id: "TLE", description: "Length", constructor: ParseTextFrame},
+	"TMT": {id: "TMT", description: "Media type", constructor: ParseTextFrame},
+	"TOA": {id: "TOA", description: "Original artist(s)/performer(s)", constructor: ParseTextFrame},
+	"TOF": {id: "TOF", description: "Original filename", constructor: ParseTextFrame},
+	"TOL": {id: "TOL", description: "Original Lyricist(s)/text writer(s)", constructor: ParseTextFrame},
+	"TOR": {id: "TOR", description: "Original release year", constructor: ParseTextFrame},
+	"TOT": {id: "TOT", description: "Original album/Movie/Show title", constructor: ParseTextFrame},
+	"TP1": {id: "TP1", description: "Lead artist(s)/Lead performer(s)/Soloist(s)/Performing group", constructor: ParseTextFrame},
+	"TP2": {id: "TP2", description: "Band/Orchestra/Accompaniment", constructor: ParseTextFrame},
+	"TP3": {id: "TP3", description: "Conductor/Performer refinement", constructor: ParseTextFrame},
+	"TP4": {id: "TP4", description: "Interpreted, remixed, or otherwise modified by", constructor: ParseTextFrame},
+	"TPA": {id: "TPA", description: "Part of a set", constructor: ParseTextFrame},
+	"TPB": {id: "TPB", description: "Publisher", constructor: ParseTextFrame},
+	"TRC": {id: "TRC", description: "ISRC (International Standard Recording Code)", constructor: ParseTextFrame},
+	"TRD": {id: "TRD", description: "Recording dates", constructor: ParseTextFrame},
+	"TRK": {id: "TRK", description: "Track number/Position in set", constructor: ParseTextFrame},
+	"TSI": {id: "TSI", description: "Size", constructor: ParseTextFrame},
+	"TSS": {id: "TSS", description: "Software/hardware and settings used for encoding", constructor: ParseTextFrame},
+	"TT1": {id: "TT1", description: "Content group description", constructor: ParseTextFrame},
+	"TT2": {id: "TT2", description: "Title/Songname/Content description", constructor: ParseTextFrame},
+	"TT3": {id: "TT3", description: "Subtitle/Description refinement", constructor: ParseTextFrame},
+	"TXT": {id: "TXT", description: "Lyricist/text writer", constructor: ParseTextFrame},
+	"TXX": {id: "TXX", description: "User defined text information frame", constructor: ParseDescTextFrame},
+	"TYE": {id: "TYE", description: "Year", constructor: ParseTextFrame},
+	"UFI": {id: "UFI", description: "Unique file identifier", constructor: ParseDataFrame},
+	"ULT": {id: "ULT", description: "Unsychronized lyric/text transcription", constructor: ParseDataFrame},
+	"WAF": {id: "WAF", description: "Official audio file webpage", constructor: ParseDataFrame},
+	"WAR": {id: "WAR", description: "Official artist/performer webpage", constructor: ParseDataFrame},
+	"WAS": {id: "WAS", description: "Official audio source webpage", constructor: ParseDataFrame},
+	"WCM": {id: "WCM", description: "Commercial information", constructor: ParseDataFrame},
+	"WCP": {id: "WCP", description: "Copyright/Legal information", constructor: ParseDataFrame},
+	"WPB": {id: "WPB", description: "Publishers official webpage", constructor: ParseDataFrame},
+	"WXX": {id: "WXX", description: "User defined URL link frame", constructor: ParseDataFrame},
 }
