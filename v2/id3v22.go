@@ -71,3 +71,13 @@ var V22FrameTypeMap = map[string]FrameType{
 	"WPB": {id: "WPB", description: "Publishers official webpage", constructor: ParseDataFrame},
 	"WXX": {id: "WXX", description: "User defined URL link frame", constructor: ParseDataFrame},
 }
+
+var V22FrameMapping = map[string]string{
+	"title":   "TT2",
+	"artist":  "TP1",
+	"album":   "TAL",
+	"year":    "TYE",
+	"comment": "COM",
+	"track":   "TRK",
+	"genre":   "TCO",
+}

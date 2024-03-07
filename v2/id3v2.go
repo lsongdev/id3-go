@@ -83,8 +83,8 @@ func ParseID3v2Header(reader *bufio.Reader) (*ID3v2Header, error) {
 
 // Parse the input for ID3 information. Returns nil if parsing failed or the
 // input didn't contain ID3 information.
-func Read(reader io.Reader) (tag *ID3v2Tag, err error) {
-	bufReader := bufio.NewReader(reader)
+func Read(data io.Reader) (tag *ID3v2Tag, err error) {
+	bufReader := bufio.NewReader(data)
 	h, err := ParseID3v2Header(bufReader)
 	if err != nil {
 		return
@@ -94,9 +94,9 @@ func Read(reader io.Reader) (tag *ID3v2Tag, err error) {
 	}
 	frameReader := NewID3v2FrameParser(h.Version)
 	rd := io.LimitReader(bufReader, int64(h.Size))
-	limitReader := bufio.NewReader(rd)
-	for frameReader.hasFrame(limitReader) {
-		frame, err := frameReader.readFrame(limitReader)
+	reader := bufio.NewReader(rd)
+	for frameReader.hasFrame(reader) {
+		frame, err := frameReader.readFrame(reader)
 		if err != nil {
 			return nil, err
 		}
@@ -165,11 +165,10 @@ func (p *ID3v2FrameParser) hasFrame(reader *bufio.Reader) bool {
 }
 
 func (parser *ID3v2FrameParser) readFrame(reader *bufio.Reader) (frame *ID3v2Frame, err error) {
-	idBytes, err := readBytes(reader, parser.IdLen)
+	id, err := readBytes(reader, parser.IdLen)
 	if err != nil {
 		return nil, err
 	}
-	id := string(idBytes)
 	sizeBytes, err := readBytes(reader, parser.SizeLen)
 	if err != nil {
 		return nil, err
@@ -181,7 +180,7 @@ func (parser *ID3v2FrameParser) readFrame(reader *bufio.Reader) (frame *ID3v2Fra
 		return nil, err
 	}
 	frame = &ID3v2Frame{
-		Id:  id,
+		Id:  string(id),
 		Raw: data,
 	}
 	return
@@ -253,16 +252,13 @@ func parseString(data []byte) (s string, err error) {
 	switch data[0] {
 	case 0x00: // ISO-8859-1 text.
 		s = ISO8859_1ToUTF8(data[1:])
-		break
 	case 0x01: // UTF-16 with BOM.
 		s = string(utf16.Decode(toUTF16(data[1:])))
-		break
 	case 0x02: // UTF-16BE without BOM.
 		err = fmt.Errorf("unsupported text encoding UTF-16BE")
 		return
 	case 0x03: // UTF-8 text.
 		s = string(data[1:])
-		break
 	default:
 		// No encoding, assume ISO-8859-1 text.
 		// s = ISO8859_1ToUTF8(data)

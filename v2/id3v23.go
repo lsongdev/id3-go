@@ -92,6 +92,16 @@ var V23FrameTypeMap = map[string]FrameType{
 	"TDRC": {id: "TDRC", description: "Recording date", constructor: ParseTextFrame},
 }
 
+var V23FrameMapping = map[string]string{
+	"title":   "TIT2",
+	"artist":  "TPE1",
+	"album":   "TALB",
+	"year":    "TYER",
+	"comment": "COMM",
+	"track":   "TRCK",
+	"genre":   "TCON",
+}
+
 type DataFrame struct {
 }
 
