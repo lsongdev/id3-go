@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	v1 "github.com/song940/id3-go/v1"
+	v1 "github.com/lsongdev/id3-go/v1"
 )
 
 type ID3v2Framer interface {
@@ -349,4 +349,49 @@ func (tag *ID3v2Tag) Title() string {
 		}
 	}
 	return ""
+}
+
+func (tag *ID3v2Tag) Album() string {
+	for _, frame := range tag.Frames {
+		if frame.Id == "TALB" {
+			return frame.Data.String()
+		}
+	}
+	return ""
+}
+
+func (tag *ID3v2Tag) Artist() string {
+	for _, frame := range tag.Frames {
+		if frame.Id == "TPE1" {
+			return frame.Data.String()
+		}
+	}
+	return ""
+}
+
+func (tag *ID3v2Tag) Genre() string {
+	for _, frame := range tag.Frames {
+		if frame.Id == "TCON" {
+			return frame.Data.String()
+		}
+	}
+	return ""
+}
+
+func (tag *ID3v2Tag) Year() string {
+	for _, frame := range tag.Frames {
+		if frame.Id == "TYER" {
+			return frame.Data.String()
+		}
+	}
+	return ""
+}
+
+func (tag *ID3v2Tag) Cover() []byte {
+	for _, frame := range tag.Frames {
+		if frame.Id == "APIC" {
+			return []byte(frame.Data.String())
+		}
+	}
+	return nil
 }

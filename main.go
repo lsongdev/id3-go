@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	v2 "github.com/song940/id3-go/v2"
+	v2 "github.com/lsongdev/id3-go/v2"
 )
 
 func main() {
@@ -29,7 +29,8 @@ func main() {
 		if err != nil {
 			return err
 		}
-		log.Println(tag.Version(), tag.Title())
+		log.Println(tag.Title())
+
 		f.Close()
 		return nil
 	})
